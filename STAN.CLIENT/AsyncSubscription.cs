@@ -64,45 +64,6 @@ namespace STAN.Client
         {
             _subject = subject;
 
-            var sr = new SubscriptionRequest
-            {
-                ClientID = _conn.ClientID,
-                Subject = subject,
-                QGroup = qgroup ?? string.Empty,
-                Inbox = Inbox,
-                MaxInFlight = _options.MaxInflight,
-                AckWaitInSecs = _options.AckWait / 1000,
-                StartPosition = _options.startAt,
-                DurableName = _options.DurableName ?? string.Empty,
-            };
-
-            // Conditionals
-            switch (sr.StartPosition)
-            {
-                case StartPosition.TimeDeltaStart:
-                    sr.StartTimeDelta = ConvertTimeSpan(
-                        _options.useStartTimeDelta ? _options.startTimeDelta : (DateTime.UtcNow - _options.startTime)
-                        );
-                    break;
-                case StartPosition.SequenceStart:
-                    sr.StartSequence = _options.startSequence;
-                    break;
-            }
-
-            byte[] b = ProtocolSerializer.marshal(sr);
-
-            // TODO: Configure request timeout?
-            Msg m = _conn.NATSConnection.Request(subRequestSubject, b, 2000);
-
-            var r = new SubscriptionResponse();
-            ProtocolSerializer.unmarshal(m.Data, r);
-            if (!string.IsNullOrWhiteSpace(r.Error))
-            {
-                throw new StanException(r.Error);
-            }
-
-            _ackInbox = r.AckInbox;
-
             // Listen for actual messages.
             _inboxSub = _conn.NATSConnection.SubscribeAsync(Inbox, (sender, args) =>
             {
@@ -130,6 +91,53 @@ namespace STAN.Client
                     }
                 }
             });
+
+            try
+            {
+                var sr = new SubscriptionRequest
+                {
+                    ClientID = _conn.ClientID,
+                    Subject = subject,
+                    QGroup = qgroup ?? string.Empty,
+                    Inbox = Inbox,
+                    MaxInFlight = _options.MaxInflight,
+                    AckWaitInSecs = _options.AckWait / 1000,
+                    StartPosition = _options.startAt,
+                    DurableName = _options.DurableName ?? string.Empty,
+                };
+
+                // Conditionals
+                switch (sr.StartPosition)
+                {
+                    case StartPosition.TimeDeltaStart:
+                        sr.StartTimeDelta = ConvertTimeSpan(
+                            _options.useStartTimeDelta ? _options.startTimeDelta : (DateTime.UtcNow - _options.startTime)
+                            );
+                        break;
+                    case StartPosition.SequenceStart:
+                        sr.StartSequence = _options.startSequence;
+                        break;
+                }
+
+                byte[] b = ProtocolSerializer.marshal(sr);
+
+                // TODO: Configure request timeout?
+                Msg m = _conn.NATSConnection.Request(subRequestSubject, b, 2000);
+
+                var r = new SubscriptionResponse();
+                ProtocolSerializer.unmarshal(m.Data, r);
+                if (!string.IsNullOrWhiteSpace(r.Error))
+                {
+                    throw new StanException(r.Error);
+                }
+
+                _ackInbox = r.AckInbox;
+            }
+            catch
+            {
+                _inboxSub.Dispose();
+                throw;
+            }
         }
 
         private void Dispose(bool disposing, bool close, bool throwEx)
