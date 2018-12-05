@@ -1,15 +1,15 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2050
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "STAN.CLIENT", "STAN.CLIENT\STAN.CLIENT.xproj", "{23EE6838-D8A6-4787-BAFB-2148EF6F5B79}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "STAN.CLIENT", "STAN.CLIENT\STAN.CLIENT.csproj", "{23EE6838-D8A6-4787-BAFB-2148EF6F5B79}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "STAN.Client.UnitTests", "STAN.Client.UnitTests\STAN.Client.UnitTests.xproj", "{9A3EA015-7552-417D-A3D9-698D664E954C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "STAN.Client.UnitTests", "STAN.Client.UnitTests\STAN.Client.UnitTests.csproj", "{9A3EA015-7552-417D-A3D9-698D664E954C}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "stan-pub", "examples\stan-pub\stan-pub.xproj", "{6AC8D7CA-C931-4DAC-B8B8-EF5011ACA356}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "stan-pub", "examples\stan-pub\stan-pub.csproj", "{6AC8D7CA-C931-4DAC-B8B8-EF5011ACA356}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "stan-sub", "examples\stan-sub\stan-sub.xproj", "{EEA80816-1BEB-47FD-97F2-1E8EB683C80D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "stan-sub", "examples\stan-sub\stan-sub.csproj", "{EEA80816-1BEB-47FD-97F2-1E8EB683C80D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,5 +36,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7FCADDD3-C38C-45A1-BA71-73E24C8F8714}
 	EndGlobalSection
 EndGlobal

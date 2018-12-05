@@ -13,9 +13,9 @@
     <tags>STAN.Client STAN.Client.BV NATS Streaming</tags>
     <dependencies>
       <group targetFramework=".NETStandard2.0">
-        <dependency id="Google.Protobuf" version="3.6.0" exclude="Build,Analyzers" />
-        <dependency id="Google.Protobuf.Tools" version="3.6.0" exclude="Build,Analyzers" />
-        <dependency id="NATS.Client" version="0.8.1" exclude="Build,Analyzers" />
+        <dependency id="Google.Protobuf" version="3.6.1" exclude="Build,Analyzers" />
+        <dependency id="Google.Protobuf.Tools" version="3.6.1" exclude="Build,Analyzers" />
+        <dependency id="NATS.Client.BV" version="0.8.2" exclude="Build,Analyzers" />
         <dependency id="System.Runtime.Serialization.Json" version="4.3.0" exclude="Build,Analyzers" />
       </group>
     </dependencies>
