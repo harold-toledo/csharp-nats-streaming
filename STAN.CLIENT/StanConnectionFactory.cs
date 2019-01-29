@@ -24,21 +24,13 @@ namespace STAN.Client
         /// <param name="clusterID"></param>
         /// <param name="clientID"></param>
         /// <param name="options"></param>
-        /// <returns></returns>
-        public IStanConnection CreateConnection(string clusterID, string clientID, StanOptions options)
-        {
-            return new Connection(clusterID, clientID, options);
-        }
+        public IStanConnection CreateConnection(string clusterID, string clientID, StanOptions options) => new Connection(clusterID, clientID, options);
 
         /// <summary>
         /// Creates a connection to the server.
         /// </summary>
         /// <param name="clusterID"></param>
         /// <param name="clientID"></param>
-        /// <returns></returns>
-        public IStanConnection CreateConnection(string clusterID, string clientID)
-        {
-            return new Connection(clusterID, clientID, null);
-        }
+        public IStanConnection CreateConnection(string clusterID, string clientID) => CreateConnection(clusterID, clientID, null);
     }
 }

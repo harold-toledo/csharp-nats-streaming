@@ -47,7 +47,7 @@ namespace STAN.Client
 
         private long ConvertTimeSpan(TimeSpan ts) => ts.Ticks * 100;
 
-        private void Ack(MsgProto msg) => _conn.NATSConnection.Publish(_ackInbox, ProtocolSerializer.createAck(msg));
+        private void Ack(MsgProto msg) => _conn.NATSConnection.Publish(_ackInbox, ProtocolSerializer.CreateAck(msg));
 
         internal void ManualAck(StanMsg m)
         {
@@ -70,7 +70,7 @@ namespace STAN.Client
                 if (!_disposed)
                 {
                     var msg = new MsgProto();
-                    ProtocolSerializer.unmarshal(args.Message.Data, msg);
+                    ProtocolSerializer.Unmarshal(args.Message.Data, msg);
 
                     handler(this, new StanMsgHandlerArgs(new StanMsg(msg, this)));
 
@@ -119,13 +119,13 @@ namespace STAN.Client
                         break;
                 }
 
-                byte[] b = ProtocolSerializer.marshal(sr);
+                byte[] b = ProtocolSerializer.Marshal(sr);
 
                 // TODO: Configure request timeout?
                 Msg m = _conn.NATSConnection.Request(subRequestSubject, b, 2000);
 
                 var r = new SubscriptionResponse();
-                ProtocolSerializer.unmarshal(m.Data, r);
+                ProtocolSerializer.Unmarshal(m.Data, r);
                 if (!string.IsNullOrWhiteSpace(r.Error))
                 {
                     throw new StanException(r.Error);

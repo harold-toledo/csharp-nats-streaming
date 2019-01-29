@@ -11,10 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 using System;
+using System.Text;
 using System.Collections.Generic;
 using System.Threading;
-using NATS.Client;
 using System.Threading.Tasks;
+using NATS.Client;
+using Google.Protobuf;
 
 /*! \mainpage %NATS .NET Streaming Client.
  *
@@ -138,20 +140,19 @@ namespace STAN.Client
 
         private volatile bool _disposed;
 
-        private readonly string _pubPrefix; // Publish prefix set by stan, append our subject.
-        private readonly string _subRequests; // Subject to send subscription requests.
-        private readonly string _unsubRequests; // Subject to send unsubscribe requests.
-        private readonly string _subCloseRequests; // Subject to send subscrption close requests.
-        private readonly string _closeRequests; // Subject to send close requests.
-        private readonly string _ackSubject; // publish acks
+        private readonly ByteString _connId;        // This is a NUID that uniquely identifies a connection. Stored as a protobuf ByteString.
+        private readonly string _pubPrefix;         // Publish prefix set by stan, append our subject.
+        private readonly string _subRequests;       // Subject to send subscription requests.
+        private readonly string _unsubRequests;     // Subject to send unsubscribe requests.
+        private readonly string _subCloseRequests;  // Subject to send subscrption close requests.
+        private readonly string _closeRequests;     // Subject to send close requests.
+        private readonly string _ackSubject;        // publish acks
 
         private ISubscription _ackSubscription;
         private ISubscription _hbSubscription;
 
         private Dictionary<string, AsyncSubscription> _subs;
         private Dictionary<string, PublishAck> _pubACKs;
-
-        private StanOptions _opts;
 
         private bool _ncOwned = false;
 
@@ -162,15 +163,16 @@ namespace STAN.Client
         internal Connection(string clusterID, string clientID, StanOptions options)
         {
             ClientID = clientID;
+            Options = StanOptions.GetFrom(options);
 
-            _opts = options != null ? new StanOptions(options) : new StanOptions();
+            _connId = ByteString.CopyFrom(Encoding.UTF8.GetBytes(NewGUID()));
 
-            if (_opts.natsConn == null)
+            if (Options.NatsConn == null)
             {
                 _ncOwned = true;
                 try
                 {
-                    NATSConnection = new ConnectionFactory().CreateConnection(_opts.NatsURL);
+                    NATSConnection = new ConnectionFactory().CreateConnection(Options.NatsURL);
                 }
                 catch (Exception e)
                 {
@@ -180,7 +182,7 @@ namespace STAN.Client
             else
             {
                 _ncOwned = false;
-                NATSConnection = _opts.natsConn;
+                NATSConnection = Options.NatsConn;
             }
 
             // create a heartbeat inbox
@@ -190,19 +192,27 @@ namespace STAN.Client
             var resp = new ConnectResponse();
             try
             {
-                byte[] data = ProtocolSerializer.marshal(new ConnectRequest
+                // The streaming server expects seconds, but can handle milliseconds as well.
+                // Milliseconds are denoted by negative numbers.
+                int pingInterval = Options.PingInterval < 1000 ? Options.PingInterval * -1 : Options.PingInterval / 1000;
+
+                byte[] data = ProtocolSerializer.Marshal(new ConnectRequest
                 {
                     ClientID = ClientID,
                     HeartbeatInbox = hbInbox,
+                    ConnID = _connId,
+                    Protocol = StanConsts.ProtocolOne,
+                    PingMaxOut = Options.PingMaxOutstanding,
+                    PingInterval = pingInterval,
                 });
 
                 Msg cr = NATSConnection.Request(
-                    $"{_opts.discoverPrefix}.{clusterID}",
+                    $"{Options.DiscoverPrefix}.{clusterID}",
                     data,
-                    _opts.ConnectTimeout
+                    Options.ConnectTimeout
                     );
 
-                ProtocolSerializer.unmarshal(cr.Data, resp);
+                ProtocolSerializer.Unmarshal(cr.Data, resp);
             }
             catch (NATSTimeoutException)
             {
@@ -235,7 +245,13 @@ namespace STAN.Client
             _subs = new Dictionary<string, AsyncSubscription>();
             _pubACKs = new Dictionary<string, PublishAck>();
 
-            ProtoSer = new ProtocolSerializer();
+            if (resp.Protocol >= StanConsts.ProtocolOne && resp.PingInterval != 0)
+            {
+                // If negative, the value represents milliseconds.
+                // If positive, the value represents seconds, but in the .NET clients we always use milliseconds.
+                Options.PingInterval = resp.PingInterval < 0 ? resp.PingInterval * -1 : resp.PingInterval * 1000;
+                Options.PingMaxOutstanding = resp.PingMaxOut;
+            }
         }
 
         // auxiliary propertites and methods
@@ -288,7 +304,7 @@ namespace STAN.Client
 
             try
             {
-                ProtocolSerializer.unmarshal(args.Message.Data, ack);
+                ProtocolSerializer.Unmarshal(args.Message.Data, ack);
             }
             catch (Exception)
             {
@@ -309,13 +325,13 @@ namespace STAN.Client
         {
             string subj = $"{_pubPrefix}.{subject}";
             string guid = NewGUID();
-            byte[] b = ProtocolSerializer.createPubMsg(ClientID, guid, subject, data);
+            byte[] b = ProtocolSerializer.CreatePubMsg(ClientID, guid, subject, data, _connId);
 
-            var ack = new PublishAck(this, guid, handler, _opts.PubAckWait);
+            var ack = new PublishAck(this, guid, handler, Options.PubAckWait);
 
             lock (_lock)
             {
-                while (_pubACKs.Count >= _opts.maxPubAcksInflight)
+                while (_pubACKs.Count >= Options.MaxPubAcksInFlight)
                 {
                     Monitor.Wait(_lock);
                 }
@@ -387,7 +403,7 @@ namespace STAN.Client
                 requestSubject = _subCloseRequests;
             }
 
-            byte[] b = ProtocolSerializer.marshal(new UnsubscribeRequest
+            byte[] b = ProtocolSerializer.Marshal(new UnsubscribeRequest
             {
                 ClientID = ClientID,
                 Subject = subject,
@@ -396,7 +412,7 @@ namespace STAN.Client
 
             var r = NATSConnection.Request(requestSubject, b, 2000);
             var sr = new SubscriptionResponse();
-            ProtocolSerializer.unmarshal(r.Data, sr);
+            ProtocolSerializer.Unmarshal(r.Data, sr);
             if (!string.IsNullOrEmpty(sr.Error))
                 throw new StanException(sr.Error);
         }
@@ -449,13 +465,13 @@ namespace STAN.Client
                 {
                     if (_closeRequests != null)
                     {
-                        Msg reply = NATSConnection.Request(_closeRequests, ProtocolSerializer.marshal(new CloseRequest { ClientID = ClientID }));
+                        Msg reply = NATSConnection.Request(_closeRequests, ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID }));
                         if (reply != null)
                         {
                             var resp = new CloseResponse();
                             try
                             {
-                                ProtocolSerializer.unmarshal(reply.Data, resp);
+                                ProtocolSerializer.Unmarshal(reply.Data, resp);
                             }
                             catch (Exception e)
                             {
@@ -486,6 +502,6 @@ namespace STAN.Client
 
         public string ClientID { get; }
 
-        internal ProtocolSerializer ProtoSer { get; }
+        public StanOptions Options { get; private set; }
     }
 }

@@ -20,14 +20,13 @@ namespace STAN.Client
     /// </summary>
     public sealed class StanOptions
     {
-        internal string natsURL = StanConsts.DefaultNatsURL;
-        internal IConnection natsConn = null;
-        internal int connectTimeout = StanConsts.DefaultConnectWait;
-        internal long ackTimeout = StanConsts.DefaultConnectWait;
-        internal string discoverPrefix = StanConsts.DefaultDiscoverPrefix;
-        internal long maxPubAcksInflight = StanConsts.DefaultMaxPubAcksInflight;
-
-        internal StanOptions() { }
+        private string natsURL = StanConsts.DefaultNatsURL;
+        private int connectTimeout = StanConsts.DefaultConnectWait;
+        private long ackTimeout = StanConsts.DefaultConnectWait;
+        private string discoverPrefix = StanConsts.DefaultDiscoverPrefix;
+        private long maxPubAcksInflight = StanConsts.DefaultMaxPubAcksInflight;
+        private int pingMaxOut = StanConsts.DefaultPingMaxOut;
+        private int pingInterval = StanConsts.DefaultPingInterval;
 
         internal static string DeepCopy(string value)
         {
@@ -37,15 +36,22 @@ namespace STAN.Client
             return new string(value.ToCharArray());
         }
 
-        internal StanOptions(StanOptions options)
+        private StanOptions() { }
+
+        private StanOptions(StanOptions opts)
         {
-            ackTimeout = options.ackTimeout;
-            NatsURL = DeepCopy(options.NatsURL);
-            ConnectTimeout = options.ConnectTimeout;
-            PubAckWait = options.PubAckWait;
-            DiscoverPrefix = DeepCopy(options.DiscoverPrefix);
-            MaxPubAcksInFlight = options.MaxPubAcksInFlight;
-            NatsConn = options.natsConn;
+            if (opts != null)
+            {
+                ackTimeout = opts.ackTimeout;
+                NatsURL = DeepCopy(opts.NatsURL);
+                ConnectTimeout = opts.ConnectTimeout;
+                PubAckWait = opts.PubAckWait;
+                DiscoverPrefix = DeepCopy(opts.DiscoverPrefix);
+                MaxPubAcksInFlight = opts.MaxPubAcksInFlight;
+                NatsConn = opts.NatsConn;
+                PingInterval = opts.PingInterval;
+                PingMaxOutstanding = opts.PingMaxOutstanding;
+            }
         }
 
         /// <summary>
@@ -59,7 +65,7 @@ namespace STAN.Client
             }
             set
             {
-                natsURL = value != null ? value : StanConsts.DefaultNatsURL;
+                natsURL = value ?? StanConsts.DefaultNatsURL;
             }
         }
 
@@ -67,16 +73,10 @@ namespace STAN.Client
         /// Sets the underlying NATS connection to be used by a NATS Streaming 
         /// connection object.
         /// </summary>
-        public IConnection NatsConn
-        {
-            set
-            {
-                natsConn = value;
-            }
-        }
+        public IConnection NatsConn { internal get; set; }
 
         /// <summary>
-        /// ConnectTimeout is an Option to set the timeout for establishing a connection.
+        /// ConnectTimeout is an Option to set the timeout (in milliseconds) for establishing a connection.
         /// </summary>
         public int ConnectTimeout
         {
@@ -94,8 +94,8 @@ namespace STAN.Client
         }
 
         /// <summary>
-        /// PubAckWait is an option to set the timeout for waiting for an ACK 
-        /// for a published message.  The value must be greater than zero.
+        /// PubAckWait is an option to set the timeout (in milliseconds) for waiting for an ACK
+        /// for a published message. The value must be greater than zero.
         /// </summary>
         public long PubAckWait
         {
@@ -124,16 +124,13 @@ namespace STAN.Client
             }
             set
             {
-                if (value == null)
-                    throw new ArgumentNullException("value", "DiscoverPrefix cannot be null.");
-
-                discoverPrefix = value;
+                discoverPrefix = value ?? throw new ArgumentNullException("value", "DiscoverPrefix cannot be null.");
             }
         }
 
         /// <summary>
         /// MaxPubAcksInflight is an Option to set the maximum number 
-        /// of published  messages without outstanding ACKs from the server.
+        /// of published messages without outstanding ACKs from the server.
         /// </summary>
         public long MaxPubAcksInFlight
         {
@@ -151,12 +148,52 @@ namespace STAN.Client
         }
 
         /// <summary>
+        /// MaxPingsOut is an option to set the maximum number 
+        /// of outstanding pings with the streaming server.
+        /// See <see cref="StanConsts.DefaultPingMaxOut"/>.
+        /// </summary>
+        public int PingMaxOutstanding
+        {
+            get
+            {
+                return pingMaxOut;
+            }
+            set
+            {
+                if (value <= 2)
+                    throw new ArgumentOutOfRangeException("value", value, "PingMaxOutstanding must be greater than two.");
+
+                pingMaxOut = value;
+            }
+        }
+
+        /// <summary>
+        /// PingInterval is an option to set the interval of pings in milliseconds.
+        /// See <see cref="StanConsts.DefaultPingInterval"/>.
+        /// </summary>
+        public int PingInterval
+        {
+            get
+            {
+                return pingInterval;
+            }
+            set
+            {
+                if (value <= 0)
+                    throw new ArgumentOutOfRangeException("value", value, "PingInterval must be greater than zero.");
+
+                pingInterval = value;
+            }
+        }
+
+        /// <summary>
         /// Returns the default connection options.
         /// </summary>
-        /// <returns></returns>
-        public static StanOptions GetDefaultOptions()
-        {
-            return new StanOptions();
-        }
+        public static StanOptions GetDefaultOptions() => new StanOptions();
+
+        /// <summary>
+        /// Returns the default connection options.
+        /// </summary>
+        public static StanOptions GetFrom(StanOptions opts) => new StanOptions(opts);
     }
 }

@@ -18,35 +18,40 @@ namespace STAN.Client
     // Keep protocol serialization encapulated here.
     internal class ProtocolSerializer
     {
-        internal static byte[] marshal(Object req)
+        internal static byte[] Marshal(object req) => ((IMessage)req).ToByteArray();
+
+        internal static void Unmarshal(byte[] bytes, object obj) => ((IMessage)obj).MergeFrom(bytes);
+
+        internal static byte[] CreatePubMsg(string clientID, string guidValue, string subject, byte[] data, ByteString connId)
         {
-            return ((IMessage)req).ToByteArray();
-        }
-
-        internal static void unmarshal(byte[] bytes, Object obj)
-        {
-            ((IMessage)obj).MergeFrom(bytes);
-        }
-
-        internal static byte[] createPubMsg(string clientID, string guidValue, string subject, byte[] data)
-        {
-            PubMsg pm = new PubMsg();
-
-            pm.ClientID = clientID;
-            pm.Guid = guidValue;
-            pm.Subject = subject;
-            if (data != null)
-                pm.Data = ByteString.CopyFrom(data);
-
+            var pm = new PubMsg
+            {
+                ClientID = clientID,
+                Guid = guidValue,
+                Subject = subject,
+                ConnID = connId,
+                Data = data == null ? null : ByteString.CopyFrom(data),
+            };
             return pm.ToByteArray();
         }
 
-        internal static byte[] createAck(MsgProto mp)
+        internal static byte[] CreateAck(MsgProto mp)
         {
-            Ack a = new Ack();
-            a.Subject = mp.Subject;
-            a.Sequence = mp.Sequence;
-            return a.ToByteArray();
+            var ack = new Ack
+            {
+                Subject = mp.Subject,
+                Sequence = mp.Sequence,
+            };
+            return ack.ToByteArray();
+        }
+
+        internal static byte[] CreatePing(ByteString connId)
+        {
+            var p = new Ping
+            {
+                ConnID = connId
+            };
+            return p.ToByteArray();
         }
     }
 }

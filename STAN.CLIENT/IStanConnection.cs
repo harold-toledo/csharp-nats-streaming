@@ -118,5 +118,7 @@ namespace STAN.Client
         /// NATS conn will invalidate the NATS Streaming connection.
         /// </summary>
         NATS.Client.IConnection NATSConnection { get; }
+
+        StanOptions Options { get; }
     }
 }
