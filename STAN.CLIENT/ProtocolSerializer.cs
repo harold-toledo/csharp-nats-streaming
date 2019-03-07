@@ -30,7 +30,7 @@ namespace STAN.Client
                 Guid = guidValue,
                 Subject = subject,
                 ConnID = connId,
-                Data = data == null ? null : ByteString.CopyFrom(data),
+                Data = data == null ? ByteString.Empty : ByteString.CopyFrom(data),
             };
             return pm.ToByteArray();
         }
