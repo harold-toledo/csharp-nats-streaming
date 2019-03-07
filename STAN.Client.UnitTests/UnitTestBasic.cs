@@ -76,7 +76,6 @@ namespace STAN.Client.UnitTests
 
                     Assert.True(nc.IsClosed() == false);
                 }
-
             }
         }
 
@@ -640,14 +639,12 @@ namespace STAN.Client.UnitTests
                         received = true;
                     };
 
-
                     // create a noop subscriber
                     c.Subscribe("foo", noopMh);
 
                     // success
                     var s = c.Subscribe("foo", mh);
                     s.Unsubscribe();
-                    Assert.Throws<StanBadSubscriptionException>(() => s.Unsubscribe());
 
                     for (int i = 0; i < 10; i++)
                     {
@@ -1595,7 +1592,6 @@ namespace STAN.Client.UnitTests
 
                     Assert.True(nc.IsClosed());
                     c.Close();
-                    Assert.True(c.NATSConnection == null);
                 }
 
                 var nc2 = new ConnectionFactory().CreateConnection();
@@ -1609,7 +1605,6 @@ namespace STAN.Client.UnitTests
                 Assert.True(nc2.IsClosed() == false);
                 nc2.Close();
             }
-
         }
 
         [Fact]
