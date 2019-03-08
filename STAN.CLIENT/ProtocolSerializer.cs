@@ -45,13 +45,6 @@ namespace STAN.Client
             return ack.ToByteArray();
         }
 
-        internal static byte[] CreatePing(ByteString connId)
-        {
-            var p = new Ping
-            {
-                ConnID = connId
-            };
-            return p.ToByteArray();
-        }
+        internal static byte[] CreatePing(ByteString connId) => new Ping { ConnID = connId }.ToByteArray();
     }
 }
