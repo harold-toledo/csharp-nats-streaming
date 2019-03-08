@@ -32,17 +32,16 @@ namespace STAN.Client
 
         private StanOptions(StanOptions opts)
         {
-            if (opts != null)
-            {
-                NatsURL = opts.NatsURL;
-                NatsConn = opts.NatsConn;
-                ConnectTimeout = opts.ConnectTimeout;
-                PubAckWait = opts.PubAckWait;
-                DiscoverPrefix = opts.DiscoverPrefix;
-                MaxPubAcksInFlight = opts.MaxPubAcksInFlight;
-                PingInterval = opts.PingInterval;
-                PingMaxOutstanding = opts.PingMaxOutstanding;
-            }
+            if (opts == null) return;
+
+            NatsURL = opts.NatsURL;
+            NatsConn = opts.NatsConn;
+            ConnectTimeout = opts.ConnectTimeout;
+            PubAckWait = opts.PubAckWait;
+            DiscoverPrefix = opts.DiscoverPrefix;
+            MaxPubAcksInFlight = opts.MaxPubAcksInFlight;
+            PingInterval = opts.PingInterval;
+            PingMaxOutstanding = opts.PingMaxOutstanding;
         }
 
         /// <summary>
