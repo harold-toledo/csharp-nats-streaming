@@ -20,21 +20,13 @@ namespace STAN.Client
     /// </summary>
     public sealed class StanOptions
     {
-        private string natsURL = StanConsts.DefaultNatsURL;
-        private int connectTimeout = StanConsts.DefaultConnectWait;
-        private long ackTimeout = StanConsts.DefaultConnectWait;
-        private string discoverPrefix = StanConsts.DefaultDiscoverPrefix;
-        private long maxPubAcksInflight = StanConsts.DefaultMaxPubAcksInflight;
-        private int pingMaxOut = StanConsts.DefaultPingMaxOut;
-        private int pingInterval = StanConsts.DefaultPingInterval;
-
-        internal static string DeepCopy(string value)
-        {
-            if (value == null)
-                return null;
-
-            return new string(value.ToCharArray());
-        }
+        private string _natsURL = StanConsts.DefaultNatsURL;
+        private int _connectTimeout = StanConsts.DefaultConnectWait;
+        private long _ackTimeout = StanConsts.DefaultConnectWait;
+        private string _discoverPrefix = StanConsts.DefaultDiscoverPrefix;
+        private long _maxPubAcksInflight = StanConsts.DefaultMaxPubAcksInflight;
+        private int _pingMaxOut = StanConsts.DefaultPingMaxOut;
+        private int _pingInterval = StanConsts.DefaultPingInterval;
 
         private StanOptions() { }
 
@@ -42,13 +34,12 @@ namespace STAN.Client
         {
             if (opts != null)
             {
-                ackTimeout = opts.ackTimeout;
-                NatsURL = DeepCopy(opts.NatsURL);
+                NatsURL = opts.NatsURL;
+                NatsConn = opts.NatsConn;
                 ConnectTimeout = opts.ConnectTimeout;
                 PubAckWait = opts.PubAckWait;
-                DiscoverPrefix = DeepCopy(opts.DiscoverPrefix);
+                DiscoverPrefix = opts.DiscoverPrefix;
                 MaxPubAcksInFlight = opts.MaxPubAcksInFlight;
-                NatsConn = opts.NatsConn;
                 PingInterval = opts.PingInterval;
                 PingMaxOutstanding = opts.PingMaxOutstanding;
             }
@@ -59,13 +50,13 @@ namespace STAN.Client
         /// </summary>
 	    public string NatsURL
         {
-            get 
+            get
             {
-                return natsURL;
+                return _natsURL;
             }
             set
             {
-                natsURL = value ?? StanConsts.DefaultNatsURL;
+                _natsURL = string.IsNullOrWhiteSpace(value) ? StanConsts.DefaultNatsURL : value;
             }
         }
 
@@ -76,20 +67,21 @@ namespace STAN.Client
         public IConnection NatsConn { internal get; set; }
 
         /// <summary>
-        /// ConnectTimeout is an Option to set the timeout (in milliseconds) for establishing a connection.
+        /// ConnectTimeout is an option to set the timeout (in milliseconds) for establishing a connection.
+        /// The value must be greater than zero.
         /// </summary>
         public int ConnectTimeout
         {
             get
             {
-                return connectTimeout;
+                return _connectTimeout;
             }
             set
             {
                 if (value <= 0)
-                    throw new ArgumentOutOfRangeException("value", value, "ConnectTimeout must be greater than zero.");
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "ConnectTimeout must be greater than zero.");
 
-                connectTimeout = value;
+                _connectTimeout = value;
             }
         }
 
@@ -101,88 +93,91 @@ namespace STAN.Client
         {
             get
             {
-                return ackTimeout;
+                return _ackTimeout;
             }
             set
             {
                 if (value <= 0)
-                    throw new ArgumentOutOfRangeException("value", value, "PubAckWait must be greater than zero.");
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "PubAckWait must be greater than zero.");
 
-                ackTimeout = value;
+                _ackTimeout = value;
             }
         }
 
         /// <summary>
         /// Sets the discover prefix used in connecting to the NATS streaming server.
-        /// This must match the settings on the NATS streaming sever.
+        /// This must match the settings on the NATS streaming server.
         /// </summary>
         public string DiscoverPrefix
         {
             get
             {
-                return discoverPrefix;
+                return _discoverPrefix;
             }
             set
             {
-                discoverPrefix = value ?? throw new ArgumentNullException("value", "DiscoverPrefix cannot be null.");
+                _discoverPrefix = value ?? throw new ArgumentNullException(nameof(value), "DiscoverPrefix cannot be null.");
             }
         }
 
         /// <summary>
-        /// MaxPubAcksInflight is an Option to set the maximum number 
-        /// of published messages without outstanding ACKs from the server.
+        /// MaxPubAcksInflight is an option to set the maximum number 
+        /// of published messages with outstanding ACKs from the server.
+        /// The value must be greater than zero.
         /// </summary>
         public long MaxPubAcksInFlight
         {
             get
             {
-                return maxPubAcksInflight;
+                return _maxPubAcksInflight;
             }
             set
             {
                 if (value <= 0)
-                    throw new ArgumentOutOfRangeException("value", value, "MaxPubAcksInFlight must be greater than zero.");
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "MaxPubAcksInFlight must be greater than zero.");
 
-                maxPubAcksInflight = value;
+                _maxPubAcksInflight = value;
             }
         }
 
         /// <summary>
         /// MaxPingsOut is an option to set the maximum number 
         /// of outstanding pings with the streaming server.
+        /// The value must be greater than two.
         /// See <see cref="StanConsts.DefaultPingMaxOut"/>.
         /// </summary>
         public int PingMaxOutstanding
         {
             get
             {
-                return pingMaxOut;
+                return _pingMaxOut;
             }
             set
             {
                 if (value <= 2)
-                    throw new ArgumentOutOfRangeException("value", value, "PingMaxOutstanding must be greater than two.");
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "PingMaxOutstanding must be greater than two.");
 
-                pingMaxOut = value;
+                _pingMaxOut = value;
             }
         }
 
         /// <summary>
         /// PingInterval is an option to set the interval of pings in milliseconds.
+        /// The value must be greater than zero.
         /// See <see cref="StanConsts.DefaultPingInterval"/>.
         /// </summary>
         public int PingInterval
         {
             get
             {
-                return pingInterval;
+                return _pingInterval;
             }
             set
             {
                 if (value <= 0)
-                    throw new ArgumentOutOfRangeException("value", value, "PingInterval must be greater than zero.");
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "PingInterval must be greater than zero.");
 
-                pingInterval = value;
+                _pingInterval = value;
             }
         }
 
@@ -192,7 +187,8 @@ namespace STAN.Client
         public static StanOptions GetDefaultOptions() => new StanOptions();
 
         /// <summary>
-        /// Returns the default connection options.
+        /// Returns new connection options using available values from the provided options. 
+        /// Default values will be used for values not available in the provided options.
         /// </summary>
         public static StanOptions GetFrom(StanOptions opts) => new StanOptions(opts);
     }
