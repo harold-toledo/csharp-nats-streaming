@@ -1586,7 +1586,7 @@ namespace STAN.Client.UnitTests
             {
                 using (var c = DefaultConnection)
                 {
-                    var nc = c.NATSConnection;
+                    var nc = c.NatsConn;
                     Assert.True(nc.State == ConnState.CONNECTED);
                     nc.Close();
 
@@ -1599,7 +1599,7 @@ namespace STAN.Client.UnitTests
                 var opts = StanOptions.GetDefaultOptions();
                 opts.NatsConn = nc2;
                 var c2 = new StanConnectionFactory().CreateConnection(CLUSTER_ID, CLIENT_ID, opts);
-                Assert.True(nc2 == c2.NATSConnection);
+                Assert.True(nc2 == c2.NatsConn);
                 c2.Close();
 
                 Assert.True(nc2.IsClosed() == false);

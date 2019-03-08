@@ -12,7 +12,10 @@
 // limitations under the License.
 using System;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Diagnostics;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NATS.Client;
@@ -136,6 +139,15 @@ namespace STAN.Client
     {
         // fields
 
+        private static List<string> _connectionFailurePatterns = new List<string>
+        {
+            "^stan: invalid publish request",
+            "^Connection closed.",
+            "^Connection is closed.",
+            "^Connection is stale.",
+            "^Connection lost due to PING failure.",
+        };
+
         private readonly object _lock = new object();
 
         private volatile bool _disposed;
@@ -146,15 +158,14 @@ namespace STAN.Client
         private readonly string _unsubRequests;     // Subject to send unsubscribe requests.
         private readonly string _subCloseRequests;  // Subject to send subscrption close requests.
         private readonly string _closeRequests;     // Subject to send close requests.
-        private readonly string _ackSubject;        // publish acks
+        private readonly string _ackSubject;        // Subject to which the server needs to send publish acks.
+        private readonly string _pingRequests;      // Subject to send the pings.
 
         private ISubscription _ackSubscription;
         private ISubscription _hbSubscription;
 
         private Dictionary<string, AsyncSubscription> _subs;
         private Dictionary<string, PublishAck> _pubACKs;
-
-        private bool _ncOwned = false;
 
         // constructors
 
@@ -167,12 +178,11 @@ namespace STAN.Client
 
             _connId = ByteString.CopyFrom(Encoding.UTF8.GetBytes(NewGUID()));
 
-            if (Options.NatsConn == null)
+            if (IsNatsConnOwned)
             {
-                _ncOwned = true;
                 try
                 {
-                    NATSConnection = new ConnectionFactory().CreateConnection(Options.NatsURL);
+                    NatsConn = new ConnectionFactory().CreateConnection(Options.NatsURL);
                 }
                 catch (Exception e)
                 {
@@ -181,13 +191,12 @@ namespace STAN.Client
             }
             else
             {
-                _ncOwned = false;
-                NATSConnection = Options.NatsConn;
+                NatsConn = Options.NatsConn;
             }
 
-            // create a heartbeat inbox
+            // create a heartbeats inbox
             string hbInbox = NewInbox();
-            _hbSubscription = NATSConnection.SubscribeAsync(hbInbox, ProcessHeartBeat);
+            _hbSubscription = NatsConn.SubscribeAsync(hbInbox, ProcessHeartBeat);
 
             var resp = new ConnectResponse();
             try
@@ -206,11 +215,7 @@ namespace STAN.Client
                     PingInterval = pingInterval,
                 });
 
-                Msg cr = NATSConnection.Request(
-                    $"{Options.DiscoverPrefix}.{clusterID}",
-                    data,
-                    Options.ConnectTimeout
-                    );
+                Msg cr = NatsConn.Request($"{Options.DiscoverPrefix}.{clusterID}", data, Options.ConnectTimeout);
 
                 ProtocolSerializer.Unmarshal(cr.Data, resp);
             }
@@ -234,10 +239,11 @@ namespace STAN.Client
             _unsubRequests = resp.UnsubRequests;
             _subCloseRequests = resp.SubCloseRequests;
             _closeRequests = resp.CloseRequests;
+            _pingRequests = resp.PingRequests;
 
             // setup the Ack subscription
             _ackSubject = $"{StanConsts.DefaultACKPrefix}.{NewGUID()}";
-            _ackSubscription = NATSConnection.SubscribeAsync(_ackSubject, ProcessAck);
+            _ackSubscription = NatsConn.SubscribeAsync(_ackSubject, ProcessAck);
 
             // TODO:  hardcode or options?
             _ackSubscription.SetPendingLimits(1024 * 1024, 32 * 1024 * 1024);
@@ -251,10 +257,60 @@ namespace STAN.Client
                 // If positive, the value represents seconds, but in the .NET clients we always use milliseconds.
                 Options.PingInterval = resp.PingInterval < 0 ? resp.PingInterval * -1 : resp.PingInterval * 1000;
                 Options.PingMaxOutstanding = resp.PingMaxOut;
+
+                // starting ping-like functionality
+                Task.Run(async () =>
+                {   
+                    byte[] ping = ProtocolSerializer.CreatePing(_connId);
+                    int limit = int.MaxValue - 1;
+                    int pingsWithoutAck = 0;
+                    var pingsInterval = TimeSpan.FromMilliseconds(Options.PingInterval);
+                    var sw = new Stopwatch();
+
+                    bool IsConnectionFailure(Exception e) =>
+                        e is StanConnectionClosedException ||
+                        e is NATSConnectionClosedException ||
+                        e is NATSStaleConnectionException ||
+                        _connectionFailurePatterns.Any(pattern => Regex.IsMatch(e.Message, pattern, RegexOptions.IgnoreCase));
+
+                    while (true)
+                    {
+                        // Trying to publish pings at the specified interval.
+                        // We could just discard this and always wait the specified pingsInterval. 
+                        // In the worst case scenario the time between pings would be: 
+                        // pingsInterval + (publish timeout)
+                        var delay = pingsInterval - sw.Elapsed;
+                        if (delay > TimeSpan.Zero)
+                        {
+                            await Task.Delay(delay);
+                        }
+                        sw.Restart();
+                        try
+                        {
+                            Publish(_pingRequests, ping);
+                            pingsWithoutAck = 0;
+                        }
+                        catch (Exception e)
+                        {
+                            pingsWithoutAck = Math.Min(pingsWithoutAck + 1, limit);
+
+                            if (pingsWithoutAck > Options.PingMaxOutstanding || IsConnectionFailure(e))
+                            {
+                                try
+                                {
+
+                                }
+                                catch { /* it really doesn't matter, everything has been logged already */ }
+                            }
+                        }
+                    }
+                });
             }
         }
 
         // auxiliary propertites and methods
+
+        private bool IsNatsConnOwned => Options.NatsConn == null;
 
         private void Dispose(bool disposing)
         {
@@ -278,7 +334,7 @@ namespace STAN.Client
             }
         }
 
-        private void ProcessHeartBeat(object sender, MsgHandlerEventArgs args) => NATSConnection.Publish(args.Message.Reply, null);
+        private void ProcessHeartBeat(object sender, MsgHandlerEventArgs args) => NatsConn.Publish(args.Message.Reply, null);
 
         private PublishAck RemoveAck(string guid)
         {
@@ -315,9 +371,9 @@ namespace STAN.Client
             HandleAck(ack.Guid, ack.Error, true);
         }
 
-        public IConnection NATSConnection { get; }
+        public IConnection NatsConn { get; }
 
-        private bool IsClosed => NATSConnection.IsClosed();
+        private bool IsClosed => NatsConn.IsClosed();
 
         private static string NewGUID() => NUID.NextGlobal;
 
@@ -340,7 +396,7 @@ namespace STAN.Client
 
             try
             {
-                NATSConnection.Publish(subj, _ackSubject, b);
+                NatsConn.Publish(subj, _ackSubject, b);
             }
             catch (Exception e)
             {
@@ -410,7 +466,7 @@ namespace STAN.Client
                 Inbox = ackInbox,
             });
 
-            var r = NATSConnection.Request(requestSubject, b, 2000);
+            var r = NatsConn.Request(requestSubject, b, 2000);
             var sr = new SubscriptionResponse();
             ProtocolSerializer.Unmarshal(r.Data, sr);
             if (!string.IsNullOrEmpty(sr.Error))
@@ -465,7 +521,7 @@ namespace STAN.Client
                 {
                     if (_closeRequests != null)
                     {
-                        Msg reply = NATSConnection.Request(_closeRequests, ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID }));
+                        Msg reply = NatsConn.Request(_closeRequests, ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID }));
                         if (reply != null)
                         {
                             var resp = new CloseResponse();
@@ -485,9 +541,9 @@ namespace STAN.Client
                         }
                     }
 
-                    if (_ncOwned)
+                    if (IsNatsConnOwned)
                     {
-                        NATSConnection.Dispose();
+                        NatsConn.Dispose();
                     }
                 }
                 catch (StanBadSubscriptionException)

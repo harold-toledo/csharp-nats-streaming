@@ -117,7 +117,7 @@ namespace STAN.Client
         /// Use this with care. For example, closing the underlying 
         /// NATS conn will invalidate the NATS Streaming connection.
         /// </summary>
-        NATS.Client.IConnection NATSConnection { get; }
+        NATS.Client.IConnection NatsConn { get; }
 
         StanOptions Options { get; }
     }
