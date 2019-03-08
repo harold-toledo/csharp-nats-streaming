@@ -32,14 +32,14 @@ namespace STAN.Client
         internal AsyncSubscription(Connection conn, StanSubscriptionOptions opts)
         {
             // TODO: Complete member initialization
-            _options = new StanSubscriptionOptions(opts);
+            _options = StanSubscriptionOptions.GetFrom(opts);
             _conn = conn;
             Inbox = Connection.NewInbox();
         }
 
         // auxiliary properties and methods
 
-        internal static StanSubscriptionOptions DefaultOptions => new StanSubscriptionOptions();
+        internal static StanSubscriptionOptions DefaultOptions => StanSubscriptionOptions.GetDefaultOptions();
 
         internal string Inbox { get; }
 
@@ -102,20 +102,18 @@ namespace STAN.Client
                     Inbox = Inbox,
                     MaxInFlight = _options.MaxInflight,
                     AckWaitInSecs = _options.AckWait / 1000,
-                    StartPosition = _options.startAt,
-                    DurableName = _options.DurableName ?? string.Empty,
+                    StartPosition = _options.StartPosition,
+                    DurableName = _options.DurableName,
                 };
 
                 // Conditionals
                 switch (sr.StartPosition)
                 {
                     case StartPosition.TimeDeltaStart:
-                        sr.StartTimeDelta = ConvertTimeSpan(
-                            _options.useStartTimeDelta ? _options.startTimeDelta : (DateTime.UtcNow - _options.startTime)
-                            );
+                        sr.StartTimeDelta = ConvertTimeSpan(_options.UseStartTimeDelta ? _options.StartTimeDelta : (DateTime.UtcNow - _options.StartTime));
                         break;
                     case StartPosition.SequenceStart:
-                        sr.StartSequence = _options.startSequence;
+                        sr.StartSequence = _options.StartSequence;
                         break;
                 }
 
