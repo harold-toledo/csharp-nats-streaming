@@ -417,7 +417,7 @@ namespace STAN.Client
                 throw new StanException(sr.Error);
         }
 
-        internal static string NewInbox() => "_INBOX." + NewGUID();
+        internal static string NewInbox() => $"_INBOX.{NewGUID()}";
 
         public IStanSubscription Subscribe(string subject, EventHandler<StanMsgHandlerArgs> handler) => 
             Subscribe(subject, AsyncSubscription.DefaultOptions, handler);
