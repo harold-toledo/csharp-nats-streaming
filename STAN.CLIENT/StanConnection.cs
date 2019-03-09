@@ -139,13 +139,15 @@ namespace STAN.Client
     {
         // fields
 
+        private const string _pingsFailure = "Connection lost due to PING failure.";
+
         private static List<string> _connectionFailurePatterns = new List<string>
         {
             "^stan: invalid publish request",
             "^Connection closed.",
             "^Connection is closed.",
             "^Connection is stale.",
-            "^Connection lost due to PING failure.",
+            $"^{_pingsFailure}",
         };
 
         private readonly object _lock = new object();
@@ -262,10 +264,10 @@ namespace STAN.Client
                 Task.Run(async () =>
                 {   
                     byte[] ping = ProtocolSerializer.CreatePing(_connId);
-                    int limit = int.MaxValue - 1;
                     int pingsWithoutAck = 0;
                     var pingsInterval = TimeSpan.FromMilliseconds(Options.PingInterval);
                     var sw = new Stopwatch();
+                    string err = string.Empty;
 
                     bool IsConnectionFailure(Exception e) =>
                         e is StanConnectionClosedException ||
@@ -287,23 +289,42 @@ namespace STAN.Client
                         sw.Restart();
                         try
                         {
-                            Publish(_pingRequests, ping);
+                            var msg = NatsConn.Request(_pingRequests, ping, Options.PubAckWait);
+                            // No data means everything is OK (no need to unmarshall)
+                            if (msg.Data?.Length > 0)
+                            {
+                                var pingResp = new PingResponse();
+                                try
+                                {
+                                    ProtocolSerializer.Unmarshal(msg.Data, pingResp);
+                                }
+                                catch
+                                {
+                                    continue; // Ignore, this as an invalid protocol message.
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(pingResp.Error))
+                                {
+                                    err = pingResp.Error;
+                                    break;
+                                }
+                            }
                             pingsWithoutAck = 0;
                         }
                         catch (Exception e)
                         {
-                            pingsWithoutAck = Math.Min(pingsWithoutAck + 1, limit);
+                            pingsWithoutAck++;
 
                             if (pingsWithoutAck > Options.PingMaxOutstanding || IsConnectionFailure(e))
                             {
-                                try
-                                {
-
-                                }
-                                catch { /* it really doesn't matter, everything has been logged already */ }
+                                err = pingsWithoutAck > Options.PingMaxOutstanding ? _pingsFailure : e.Message;
+                                break;
                             }
                         }
                     }
+
+                    // if we are here, a connection failure has occurred and err cannot be empty.
+                    // do something
                 });
             }
         }
