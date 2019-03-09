@@ -22,7 +22,7 @@ namespace STAN.Client
     {
         private string _natsURL = StanConsts.DefaultNatsURL;
         private int _connectTimeout = StanConsts.DefaultConnectWait;
-        private long _ackTimeout = StanConsts.DefaultConnectWait;
+        private int _ackTimeout = StanConsts.DefaultConnectWait;
         private string _discoverPrefix = StanConsts.DefaultDiscoverPrefix;
         private long _maxPubAcksInflight = StanConsts.DefaultMaxPubAcksInflight;
         private int _pingMaxOut = StanConsts.DefaultPingMaxOut;
@@ -88,7 +88,7 @@ namespace STAN.Client
         /// PubAckWait is an option to set the timeout (in milliseconds) for waiting for an ACK
         /// for a published message. The value must be greater than zero.
         /// </summary>
-        public long PubAckWait
+        public int PubAckWait
         {
             get
             {
@@ -142,7 +142,7 @@ namespace STAN.Client
         /// <summary>
         /// MaxPingsOut is an option to set the maximum number 
         /// of outstanding pings with the streaming server.
-        /// The value must be greater than two.
+        /// The value must be greater than two and less than int.MaxValue.
         /// See <see cref="StanConsts.DefaultPingMaxOut"/>.
         /// </summary>
         public int PingMaxOutstanding
@@ -153,8 +153,8 @@ namespace STAN.Client
             }
             set
             {
-                if (value <= 2)
-                    throw new ArgumentOutOfRangeException(nameof(value), value, "PingMaxOutstanding must be greater than two.");
+                if (value <= 2 || value == int.MaxValue)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, $"PingMaxOutstanding must be greater than two and less than {int.MaxValue}.");
 
                 _pingMaxOut = value;
             }
