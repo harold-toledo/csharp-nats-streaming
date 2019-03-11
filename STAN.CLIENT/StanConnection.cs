@@ -533,6 +533,8 @@ namespace STAN.Client
             {
                 _disposed = true;
 
+                _tokenSource?.Cancel();
+
                 if (IsClosed)
                     return;
 
@@ -553,8 +555,6 @@ namespace STAN.Client
                     {
                         Unsubscribe(_ackSubscription);
                         Unsubscribe(_hbSubscription);
-                        
-                        _tokenSource?.Cancel();
 
                         if (_closeRequests != null)
                         {
