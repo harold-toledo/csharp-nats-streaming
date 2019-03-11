@@ -32,7 +32,12 @@ namespace STAN.Client
         /// <summary>
         /// DefaultConnectWait is the default timeout used for the connect operation.
         /// </summary>
-        public const int    DefaultConnectWait = 2000;
+        public const int DefaultConnectTimeout = 2000;
+
+        /// <summary>
+        /// DefaultCloseTimeout is the default timeout when trying to close the connection with the streaming server.
+        /// </summary>
+        public const int DefaultCloseTimeout = 2000;
 
         /// <summary>
         /// DefaultDiscoverPrefix is the prefix subject used to connect to the NATS Streaming server.

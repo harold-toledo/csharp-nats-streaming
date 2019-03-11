@@ -151,6 +151,8 @@ namespace STAN.Client
         };
 
         private readonly object _lock = new object();
+        private readonly CancellationTokenSource _tokenSource;
+        private readonly CancellationToken _token;
 
         private volatile bool _disposed;
 
@@ -255,14 +257,17 @@ namespace STAN.Client
 
             if (resp.Protocol >= StanConsts.ProtocolOne && resp.PingInterval != 0)
             {
+                _tokenSource = new CancellationTokenSource();
+                _token = _tokenSource.Token;
+
                 // If negative, the value represents milliseconds.
                 // If positive, the value represents seconds, but in the .NET clients we always use milliseconds.
                 Options.PingInterval = resp.PingInterval < 0 ? resp.PingInterval * -1 : resp.PingInterval * 1000;
                 Options.PingMaxOutstanding = resp.PingMaxOut;
 
                 // starting ping-like functionality
-                Task.Run(async () =>
-                {   
+                var task = Task.Run(async () =>
+                {
                     byte[] ping = ProtocolSerializer.CreatePing(_connId);
                     int pingsWithoutAck = 0;
                     var pingsInterval = TimeSpan.FromMilliseconds(Options.PingInterval);
@@ -275,7 +280,7 @@ namespace STAN.Client
                         e is NATSStaleConnectionException ||
                         _connectionFailurePatterns.Any(pattern => Regex.IsMatch(e.Message, pattern, RegexOptions.IgnoreCase));
 
-                    while (true)
+                    while (!_token.IsCancellationRequested && err.Length == 0)
                     {
                         // Trying to publish pings at the specified interval.
                         // We could just discard this and always wait the specified pingsInterval. 
@@ -290,6 +295,7 @@ namespace STAN.Client
                         try
                         {
                             var msg = NatsConn.Request(_pingRequests, ping, Options.PubAckWait);
+
                             // No data means everything is OK (no need to unmarshall)
                             if (msg.Data?.Length > 0)
                             {
@@ -302,12 +308,7 @@ namespace STAN.Client
                                 {
                                     continue; // Ignore, this as an invalid protocol message.
                                 }
-
-                                if (!string.IsNullOrWhiteSpace(pingResp.Error))
-                                {
-                                    err = pingResp.Error;
-                                    break;
-                                }
+                                err = pingResp.Error?.Trim() ?? err;
                             }
                             pingsWithoutAck = 0;
                         }
@@ -318,42 +319,32 @@ namespace STAN.Client
                             if (pingsWithoutAck > Options.PingMaxOutstanding || IsConnectionFailure(e))
                             {
                                 err = pingsWithoutAck > Options.PingMaxOutstanding ? _pingsFailure : e.Message;
-                                break;
                             }
                         }
                     }
 
-                    // if we are here, a connection failure has occurred and err cannot be empty.
-                    // do something
-                });
+                    _token.ThrowIfCancellationRequested();
+
+                    // If we are here, a connection failure has occurred.
+                    Dispose();
+
+                    try
+                    {
+                        // If a connection lost handler has been specified, it will be called.
+                        Options.ConnectionLostHandler?.Invoke(err);
+                    }
+                    catch
+                    {
+                        // ignore user exceptions
+                    }
+
+                }, _token);
             }
         }
 
         // auxiliary propertites and methods
 
         private bool IsNatsConnOwned => Options.NatsConn == null;
-
-        private void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                _disposed = true;
-
-                if (disposing)
-                {
-                    // Dispose all managed resources.
-
-                    try
-                    {
-                        Close();
-                    }
-                    catch (Exception) {  /* ignore */ }
-
-                    GC.SuppressFinalize(this);
-                }
-                // Clean up unmanaged resources here.
-            }
-        }
 
         private void ProcessHeartBeat(object sender, MsgHandlerEventArgs args) => NatsConn.Publish(args.Message.Reply, null);
 
@@ -395,6 +386,14 @@ namespace STAN.Client
         public IConnection NatsConn { get; }
 
         private bool IsClosed => NatsConn.IsClosed();
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed || IsClosed)
+            {
+                throw new StanConnectionClosedException();
+            }
+        }
 
         private static string NewGUID() => NUID.NextGlobal;
 
@@ -528,54 +527,71 @@ namespace STAN.Client
             return Subscribe(subject, qgroup, handler, options);
         }
 
-        public void Close()
+        public void Dispose()
         {
-            if (IsClosed)
-                return;
-
-            lock (_lock)
+            if (!_disposed)
             {
-                _ackSubscription?.Unsubscribe();
-                _hbSubscription?.Unsubscribe();
+                _disposed = true;
+
+                if (IsClosed)
+                    return;
+
+                // Dispose all managed resources.
 
                 try
                 {
-                    if (_closeRequests != null)
+                    void Unsubscribe(ISubscription sub)
                     {
-                        Msg reply = NatsConn.Request(_closeRequests, ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID }));
-                        if (reply != null)
+                        try
                         {
-                            var resp = new CloseResponse();
-                            try
-                            {
-                                ProtocolSerializer.Unmarshal(reply.Data, resp);
-                            }
-                            catch (Exception e)
-                            {
-                                throw new StanCloseRequestException(e);
-                            }
+                            sub?.Unsubscribe();
+                        }
+                        catch { /* ignore */ }
+                    }
 
-                            if (!string.IsNullOrEmpty(resp.Error))
+                    lock (_lock)
+                    {
+                        Unsubscribe(_ackSubscription);
+                        Unsubscribe(_hbSubscription);
+                        
+                        _tokenSource?.Cancel();
+
+                        if (_closeRequests != null)
+                        {
+                            var data = ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID });
+                            Msg reply = NatsConn.Request(_closeRequests, data, Options.CloseTimeout);
+                            if (reply != null)
                             {
-                                throw new StanCloseRequestException(resp.Error);
+                                var resp = new CloseResponse();
+                                try
+                                {
+                                    ProtocolSerializer.Unmarshal(reply.Data, resp);
+                                }
+                                catch (Exception e)
+                                {
+                                    throw new StanCloseRequestException(e);
+                                }
+
+                                if (!string.IsNullOrEmpty(resp.Error))
+                                {
+                                    // do not throw exception, consider loging instead
+                                }
                             }
                         }
-                    }
 
-                    if (IsNatsConnOwned)
-                    {
-                        NatsConn.Dispose();
+                        if (IsNatsConnOwned)
+                        {
+                            NatsConn.Dispose();
+                        }
                     }
                 }
-                catch (StanBadSubscriptionException)
-                {
-                    // it's possible we never actually connected.
-                    return;
-                }
+                catch {  /* ignore */ }
+
+                GC.SuppressFinalize(this);
             }
         }
 
-        public void Dispose() => Dispose(true);
+        public void Close() => Dispose();
 
         public string ClientID { get; }
 

@@ -21,8 +21,9 @@ namespace STAN.Client
     public sealed class StanOptions
     {
         private string _natsURL = StanConsts.DefaultNatsURL;
-        private int _connectTimeout = StanConsts.DefaultConnectWait;
-        private int _ackTimeout = StanConsts.DefaultConnectWait;
+        private int _connectTimeout = StanConsts.DefaultConnectTimeout;
+        private int _closeTimeout = StanConsts.DefaultCloseTimeout;
+        private int _ackTimeout = StanConsts.DefaultConnectTimeout;
         private string _discoverPrefix = StanConsts.DefaultDiscoverPrefix;
         private long _maxPubAcksInflight = StanConsts.DefaultMaxPubAcksInflight;
         private int _pingMaxOut = StanConsts.DefaultPingMaxOut;
@@ -37,11 +38,13 @@ namespace STAN.Client
             NatsURL = opts.NatsURL;
             NatsConn = opts.NatsConn;
             ConnectTimeout = opts.ConnectTimeout;
+            CloseTimeout = opts.CloseTimeout;
             PubAckWait = opts.PubAckWait;
             DiscoverPrefix = opts.DiscoverPrefix;
             MaxPubAcksInFlight = opts.MaxPubAcksInFlight;
             PingInterval = opts.PingInterval;
             PingMaxOutstanding = opts.PingMaxOutstanding;
+            ConnectionLostHandler = opts.ConnectionLostHandler;
         }
 
         /// <summary>
@@ -66,7 +69,7 @@ namespace STAN.Client
         public IConnection NatsConn { internal get; set; }
 
         /// <summary>
-        /// ConnectTimeout is an option to set the timeout (in milliseconds) for establishing a connection.
+        /// ConnectTimeout is an option to set the timeout (in milliseconds) when establishing a connection.
         /// The value must be greater than zero.
         /// </summary>
         public int ConnectTimeout
@@ -81,6 +84,25 @@ namespace STAN.Client
                     throw new ArgumentOutOfRangeException(nameof(value), value, "ConnectTimeout must be greater than zero.");
 
                 _connectTimeout = value;
+            }
+        }
+
+        /// <summary>
+        /// CloseTimeout is an option to set the timeout (in milliseconds) when closing a connection.
+        /// The value must be greater than zero.
+        /// </summary>
+        public int CloseTimeout
+        {
+            get
+            {
+                return _closeTimeout;
+            }
+            set
+            {
+                if (value <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "CloseTimeout must be greater than zero.");
+
+                _closeTimeout = value;
             }
         }
 
@@ -179,6 +201,14 @@ namespace STAN.Client
                 _pingInterval = value;
             }
         }
+
+        /// <summary>
+        /// Represents the method that will be called for notifying that 
+        /// the connection to the nats streaming server has been lost.
+        /// The string parameter in the handler will contain the reason/detail
+        /// about why the connection was lost, if available.
+        /// </summary>
+        public Action<string> ConnectionLostHandler { get; set; }
 
         /// <summary>
         /// Returns the default connection options.
