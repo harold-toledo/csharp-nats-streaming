@@ -399,6 +399,8 @@ namespace STAN.Client
 
         private PublishAck publish(string subject, byte[] data, EventHandler<StanAckHandlerArgs> handler)
         {
+            ThrowIfDisposed();
+
             string subj = $"{_pubPrefix}.{subject}";
             string guid = NewGUID();
             byte[] b = ProtocolSerializer.CreatePubMsg(ClientID, guid, subject, data, _connId);
@@ -449,6 +451,8 @@ namespace STAN.Client
 
         private IStanSubscription Subscribe(string subject, string qgroup, EventHandler<StanMsgHandlerArgs> handler, StanSubscriptionOptions options)
         {
+            ThrowIfDisposed();
+
             var sub = new AsyncSubscription(this, options);
 
             sub.Subscribe(_subRequests, subject, qgroup, handler);
@@ -464,6 +468,8 @@ namespace STAN.Client
 
         internal void Unsubscribe(string subject, string inbox, string ackInbox, bool close)
         {
+            ThrowIfDisposed();
+
             lock (_lock)
             {
                 _subs.Remove(inbox);
