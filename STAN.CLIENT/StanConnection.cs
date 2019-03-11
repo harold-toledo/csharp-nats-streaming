@@ -560,6 +560,7 @@ namespace STAN.Client
                         {
                             var data = ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID });
                             Msg reply = NatsConn.Request(_closeRequests, data, Options.CloseTimeout);
+                            // Processing of the response is not needed, but keeping this for reference.
                             if (reply != null)
                             {
                                 var resp = new CloseResponse();
