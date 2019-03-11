@@ -167,6 +167,9 @@ namespace STAN.Client
 
         private ISubscription _ackSubscription;
         private ISubscription _hbSubscription;
+        private ISubscription _pingSubscription;
+        private volatile int _pingsWithoutAck;
+        private int _pingsFailureNotified;
 
         private Dictionary<string, AsyncSubscription> _subs;
         private Dictionary<string, PublishAck> _pubACKs;
@@ -265,13 +268,36 @@ namespace STAN.Client
                 Options.PingInterval = resp.PingInterval < 0 ? resp.PingInterval * -1 : resp.PingInterval * 1000;
                 Options.PingMaxOutstanding = resp.PingMaxOut;
 
+                _pingSubscription = NatsConn.SubscribeAsync(NewInbox(), (sender, e) => 
+                {
+                    // No data means everything is OK (no need to unmarshall)
+                    var data = e.Message.Data;
+                    if (data?.Length > 0)
+                    {
+                        var pingResp = new PingResponse();
+                        try
+                        {
+                            ProtocolSerializer.Unmarshal(data, pingResp);
+                        }
+                        catch
+                        {
+                            return; // Ignore, this as an invalid protocol message.
+                        }
+                        string err = pingResp.Error?.Trim() ?? string.Empty;
+                        if (err.Length > 0)
+                        {
+                            Dispose();
+                            PingsFailure(err);
+                        }
+                    }
+                    _pingsWithoutAck = 0;
+                });
+
                 // starting ping-like functionality
                 var task = Task.Run(async () =>
                 {
                     byte[] ping = ProtocolSerializer.CreatePing(_connId);
-                    int pingsWithoutAck = 0;
                     var pingsInterval = TimeSpan.FromMilliseconds(Options.PingInterval);
-                    var sw = new Stopwatch();
                     string err = string.Empty;
 
                     bool IsConnectionFailure(Exception e) =>
@@ -282,43 +308,21 @@ namespace STAN.Client
 
                     while (!_token.IsCancellationRequested && err.Length == 0)
                     {
-                        // Trying to publish pings at the specified interval.
-                        // We could just discard this and always wait the specified pingsInterval. 
-                        // In the worst case scenario the time between pings would be: 
-                        // pingsInterval + (publish timeout)
-                        var delay = pingsInterval - sw.Elapsed;
-                        if (delay > TimeSpan.Zero)
-                        {
-                            await Task.Delay(delay);
-                        }
-                        sw.Restart();
-                        try
-                        {
-                            var msg = NatsConn.Request(_pingRequests, ping, Options.PubAckWait);
+                        await Task.Delay(pingsInterval);
 
-                            // No data means everything is OK (no need to unmarshall)
-                            if (msg.Data?.Length > 0)
+                        if (Interlocked.Increment(ref _pingsWithoutAck) > Options.PingMaxOutstanding)
+                        {
+                            err = _pingsFailure;
+                        }
+                        else
+                        {
+                            try
                             {
-                                var pingResp = new PingResponse();
-                                try
-                                {
-                                    ProtocolSerializer.Unmarshal(msg.Data, pingResp);
-                                }
-                                catch
-                                {
-                                    continue; // Ignore, this as an invalid protocol message.
-                                }
-                                err = pingResp.Error?.Trim() ?? err;
+                                NatsConn.Publish(_pingRequests, _pingSubscription.Subject, ping);
                             }
-                            pingsWithoutAck = 0;
-                        }
-                        catch (Exception e)
-                        {
-                            pingsWithoutAck++;
-
-                            if (pingsWithoutAck > Options.PingMaxOutstanding || IsConnectionFailure(e))
+                            catch (Exception e)
                             {
-                                err = pingsWithoutAck > Options.PingMaxOutstanding ? _pingsFailure : e.Message;
+                                err = IsConnectionFailure(e) ? e.Message : err;
                             }
                         }
                     }
@@ -327,16 +331,7 @@ namespace STAN.Client
 
                     // If we are here, a connection failure has occurred.
                     Dispose();
-
-                    try
-                    {
-                        // If a connection lost handler has been specified, it will be called.
-                        Options.ConnectionLostHandler?.Invoke(err);
-                    }
-                    catch
-                    {
-                        // ignore user exceptions
-                    }
+                    PingsFailure(err);
 
                 }, _token);
             }
@@ -345,6 +340,19 @@ namespace STAN.Client
         // auxiliary propertites and methods
 
         private bool IsNatsConnOwned => Options.NatsConn == null;
+
+        private void PingsFailure(string details)
+        {
+            // Making sure that if a connection lost handler was specified, it will be called only once.
+            if (Interlocked.CompareExchange(ref _pingsFailureNotified, 1, 0) == 0)
+            {
+                try
+                {
+                    Options.ConnectionLostHandler?.Invoke(details);
+                }
+                catch { /* ignore user exceptions */ }
+            }
+        }
 
         private void ProcessHeartBeat(object sender, MsgHandlerEventArgs args) => NatsConn.Publish(args.Message.Reply, null);
 
@@ -561,6 +569,7 @@ namespace STAN.Client
                     {
                         Unsubscribe(_ackSubscription);
                         Unsubscribe(_hbSubscription);
+                        Unsubscribe(_pingSubscription);
 
                         if (_closeRequests != null)
                         {
