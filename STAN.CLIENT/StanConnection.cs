@@ -413,7 +413,7 @@ namespace STAN.Client
             string guid = NewGUID();
             byte[] b = ProtocolSerializer.CreatePubMsg(ClientID, guid, subject, data, _connId);
 
-            var ack = new PublishAck(this, guid, handler, Options.PubAckWait);
+            var ack = new PublishAck(this, guid, handler, Options.PubAckTimeout);
 
             lock (_lock)
             {
@@ -549,13 +549,10 @@ namespace STAN.Client
 
                 _tokenSource?.Cancel();
 
-                if (IsClosed)
-                    return;
-
-                // Dispose all managed resources.
-
-                try
+                if (!IsClosed)
                 {
+                    // Dispose all managed resources.
+
                     void Unsubscribe(ISubscription sub)
                     {
                         try
@@ -573,26 +570,30 @@ namespace STAN.Client
 
                         if (_closeRequests != null)
                         {
-                            var data = ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID });
-                            Msg reply = NatsConn.Request(_closeRequests, data, Options.CloseTimeout);
-                            // Processing of the response is not needed, but keeping this for reference.
-                            if (reply != null)
+                            try
                             {
-                                var resp = new CloseResponse();
-                                try
+                                var data = ProtocolSerializer.Marshal(new CloseRequest { ClientID = ClientID });
+                                Msg reply = NatsConn.Request(_closeRequests, data, Options.CloseTimeout);
+                                // Processing of the response is not needed, but keeping this for reference.
+                                if (reply != null)
                                 {
-                                    ProtocolSerializer.Unmarshal(reply.Data, resp);
-                                }
-                                catch (Exception e)
-                                {
-                                    throw new StanCloseRequestException(e);
-                                }
+                                    var resp = new CloseResponse();
+                                    try
+                                    {
+                                        ProtocolSerializer.Unmarshal(reply.Data, resp);
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        throw new StanCloseRequestException(e);
+                                    }
 
-                                if (!string.IsNullOrEmpty(resp.Error))
-                                {
-                                    // do not throw exception, consider loging instead
+                                    if (!string.IsNullOrEmpty(resp.Error))
+                                    {
+                                        // do not throw exception, consider loging instead
+                                    }
                                 }
                             }
+                            catch {  /* ignore */ }
                         }
 
                         if (IsNatsConnOwned)
@@ -601,7 +602,6 @@ namespace STAN.Client
                         }
                     }
                 }
-                catch {  /* ignore */ }
 
                 GC.SuppressFinalize(this);
             }
