@@ -578,15 +578,7 @@ namespace STAN.Client
                                 if (reply != null)
                                 {
                                     var resp = new CloseResponse();
-                                    try
-                                    {
-                                        ProtocolSerializer.Unmarshal(reply.Data, resp);
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        throw new StanCloseRequestException(e);
-                                    }
-
+                                    ProtocolSerializer.Unmarshal(reply.Data, resp);
                                     if (!string.IsNullOrEmpty(resp.Error))
                                     {
                                         // do not throw exception, consider logging instead
