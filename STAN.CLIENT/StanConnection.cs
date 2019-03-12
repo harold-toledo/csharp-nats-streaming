@@ -559,7 +559,7 @@ namespace STAN.Client
                         {
                             sub?.Unsubscribe();
                         }
-                        catch { /* ignore */ }
+                        catch { /* ignore (logging could also be added) */ }
                     }
 
                     lock (_lock)
@@ -589,11 +589,11 @@ namespace STAN.Client
 
                                     if (!string.IsNullOrEmpty(resp.Error))
                                     {
-                                        // do not throw exception, consider loging instead
+                                        // do not throw exception, consider logging instead
                                     }
                                 }
                             }
-                            catch {  /* ignore */ }
+                            catch { /* ignore (logging could also be added) */ }
                         }
 
                         if (IsNatsConnOwned)
