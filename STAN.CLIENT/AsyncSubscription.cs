@@ -101,7 +101,7 @@ namespace STAN.Client
                     QGroup = qgroup ?? string.Empty,
                     Inbox = Inbox,
                     MaxInFlight = _options.MaxInflight,
-                    AckWaitInSecs = _options.AckWait / 1000,
+                    AckWaitInSecs = _options.AckTimeout / 1000,
                     StartPosition = _options.StartPosition,
                     DurableName = _options.DurableName,
                 };

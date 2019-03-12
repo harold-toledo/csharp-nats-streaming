@@ -119,7 +119,7 @@ namespace STAN.Client
             set
             {
                 if (value <= 0)
-                    throw new ArgumentOutOfRangeException(nameof(value), value, "PubAckWait must be greater than zero.");
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "PubAckTimeout must be greater than zero.");
 
                 _pubAckTimeout = value;
             }

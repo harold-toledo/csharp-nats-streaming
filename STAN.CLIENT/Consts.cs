@@ -30,12 +30,14 @@ namespace STAN.Client
         public const string DefaultNatsURL = "nats://localhost:4222";
 
         /// <summary>
-        /// DefaultConnectWait is the default timeout used for the connect operation.
+        /// DefaultConnectTimeout is the default timeout used for the connect operation.
+        /// The value represents milliseconds.
         /// </summary>
         public const int DefaultConnectTimeout = 2000;
 
         /// <summary>
-        /// DefaultCloseTimeout is the default timeout when trying to close the connection with the streaming server.
+        /// DefaultCloseTimeout is the default timeout when trying to close a connection with the cluster.
+        /// The value represents milliseconds.
         /// </summary>
         public const int DefaultCloseTimeout = 2000;
 
@@ -56,9 +58,11 @@ namespace STAN.Client
         public const long DefaultMaxPubAcksInflight = 16384;
 
         /// <summary>
-        /// DefaultAckWait indicates how long the server should wait for an ACK before resending a message.
+        /// DefaultAckTimeout is the default timeout for how long should the server 
+        /// wait for a sent message acknowledgement before resending the message.
+        /// The value represents milliseconds.
         /// </summary>
-        public const long DefaultAckWait = 30000;
+        public const int DefaultAckTimeout = 30000;
 
         /// <summary>
         /// DefaultMaxInflight indicates how many messages with outstanding ACKs the server can send.

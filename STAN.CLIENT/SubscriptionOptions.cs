@@ -21,7 +21,7 @@ namespace STAN.Client
     public class StanSubscriptionOptions
     {
         private string _durableName = string.Empty;
-        private int _ackWait = 30000;
+        private int _ackTimeout =  StanConsts.DefaultAckTimeout;
         private int _maxInflight = StanConsts.DefaultMaxInflight;
 
         private StanSubscriptionOptions() { }
@@ -33,7 +33,7 @@ namespace STAN.Client
             if (opts == null) return;
 
             DurableName = opts.DurableName;
-            AckWait = opts.AckWait;
+            AckTimeout = opts.AckTimeout;
             LeaveOpen = opts.LeaveOpen;
             ManualAcks = opts.ManualAcks;
             MaxInflight = opts.MaxInflight;
@@ -97,20 +97,22 @@ namespace STAN.Client
         }
 
         /// <summary>
-        /// Controls the time the cluster will wait for an ACK for a given message in milliseconds.
+        /// AckTimeout controls how long should the cluster wait for a sent message acknowledgement
+        /// before resending the message.
         /// </summary>
         /// <remarks>
+        /// The value must be in milliseconds.
         /// The value must be at least one second (1000 ms).
         /// </remarks>
-        public int AckWait
+        public int AckTimeout
         {
-            get { return _ackWait; }
+            get { return _ackTimeout; }
             set
             {
                 if (value < 1000)
-                    throw new ArgumentOutOfRangeException(nameof(value), value, "AckWait cannot be less than 1000.");
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "AckTimeout cannot be less than 1000.");
  
-                _ackWait = value;
+                _ackTimeout = value;
             }
         }
 

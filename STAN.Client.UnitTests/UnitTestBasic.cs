@@ -898,14 +898,14 @@ namespace STAN.Client.UnitTests
 
                     var sOpts = StanSubscriptionOptions.GetDefaultOptions();
                     // make sure we get an error from an invalid Ack wait
-                    Assert.Throws<ArgumentOutOfRangeException>(() => { sOpts.AckWait = 500; });
+                    Assert.Throws<ArgumentOutOfRangeException>(() => { sOpts.AckTimeout = 500; });
 
                     int ackRedeliverTime = 1000;
 
                     sOpts.DeliverAllAvailable();
                     sOpts.ManualAcks = true;
                     sOpts.MaxInflight = toSend + 1;
-                    sOpts.AckWait = ackRedeliverTime;
+                    sOpts.AckTimeout = ackRedeliverTime;
 
                     long received = 0;
 
@@ -948,12 +948,12 @@ namespace STAN.Client.UnitTests
 
                     var sOpts = StanSubscriptionOptions.GetDefaultOptions();
                     // make sure we get an error from an invalid Ack wait
-                    Assert.Throws<ArgumentOutOfRangeException>(() => { sOpts.AckWait = 500; });
+                    Assert.Throws<ArgumentOutOfRangeException>(() => { sOpts.AckTimeout = 500; });
 
                     sOpts.DeliverAllAvailable();
                     sOpts.ManualAcks = true;
                     sOpts.MaxInflight = toSend;
-                    sOpts.AckWait = 2000;
+                    sOpts.AckTimeout = 2000;
 
                     long received = 0;
 
@@ -1044,7 +1044,7 @@ namespace STAN.Client.UnitTests
 
                     IStanSubscription s = null;
                     var sOpts = StanSubscriptionOptions.GetDefaultOptions();
-                    sOpts.AckWait = ackRedeliveryTime;
+                    sOpts.AckTimeout = ackRedeliveryTime;
                     sOpts.ManualAcks = true;
 
                     if (useQueueSub)
@@ -1353,7 +1353,7 @@ namespace STAN.Client.UnitTests
 
                     s1 = c.Subscribe("foo", "bar", sOpts, mh);
 
-                    sOpts.AckWait = 1000;
+                    sOpts.AckTimeout = 1000;
                     s2 = c.Subscribe("foo", "bar", sOpts, mh);
 
                     for (int i = 0; i < toSend; i++)
@@ -1413,7 +1413,7 @@ namespace STAN.Client.UnitTests
 
                     s1 = c.Subscribe("foo", "bar", sOpts, mh);
 
-                    sOpts.AckWait = 1000;
+                    sOpts.AckTimeout = 1000;
                     s2 = c.Subscribe("foo", "bar", sOpts, mh);
 
                     for (int i = 0; i < toSend; i++)
@@ -1450,7 +1450,7 @@ namespace STAN.Client.UnitTests
                     var sOpts = StanSubscriptionOptions.GetDefaultOptions();
                     sOpts.DeliverAllAvailable();
                     sOpts.ManualAcks = true;
-                    sOpts.AckWait = 1000;
+                    sOpts.AckTimeout = 1000;
 
                     var s = c.Subscribe("foo", sOpts, (obj, args) =>
                     {
