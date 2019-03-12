@@ -112,7 +112,7 @@ namespace STAN.Client.UnitTests
             {
                 var opts = StanOptions.GetDefaultOptions();
                 opts.MaxPubAcksInFlight = 2;
-                opts.PubAckWait = 10 * 1000;
+                opts.PubAckTimeout = 10 * 1000;
 
                 AutoResetEvent ev = new AutoResetEvent(true);
 
@@ -667,7 +667,7 @@ namespace STAN.Client.UnitTests
             using (new NatsStreamingServer())
             {
                 var cOpts = StanOptions.GetDefaultOptions();
-                cOpts.PubAckWait = 50;
+                cOpts.PubAckTimeout = 50;
                 using (var c = new StanConnectionFactory().CreateConnection(CLUSTER_ID, CLIENT_ID, cOpts))
                 {
                     AutoResetEvent ev = new AutoResetEvent(false);
@@ -1614,7 +1614,7 @@ namespace STAN.Client.UnitTests
             {
                 AutoResetEvent ev = new AutoResetEvent(false);
                 var opts = StanOptions.GetDefaultOptions();
-                opts.PubAckWait = 4000;
+                opts.PubAckTimeout = 4000;
                 opts.MaxPubAcksInFlight = 1;
 
                 using (var c = new StanConnectionFactory().CreateConnection(
@@ -2061,7 +2061,7 @@ namespace STAN.Client.UnitTests
                     var so = StanOptions.GetDefaultOptions();
                     so.PingInterval = 50;
                     so.PingMaxOutstanding = 10;
-                    so.PubAckWait = 100;
+                    so.PubAckTimeout = 100;
                     var sc = scf.CreateConnection(CLUSTER_ID, CLIENT_ID);
 
                     int total = 10;

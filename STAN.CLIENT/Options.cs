@@ -23,7 +23,7 @@ namespace STAN.Client
         private string _natsURL = StanConsts.DefaultNatsURL;
         private int _connectTimeout = StanConsts.DefaultConnectTimeout;
         private int _closeTimeout = StanConsts.DefaultCloseTimeout;
-        private int _ackTimeout = StanConsts.DefaultConnectTimeout;
+        private int _pubAckTimeout = StanConsts.DefaultConnectTimeout;
         private string _discoverPrefix = StanConsts.DefaultDiscoverPrefix;
         private long _maxPubAcksInflight = StanConsts.DefaultMaxPubAcksInflight;
         private int _pingMaxOut = StanConsts.DefaultPingMaxOut;
@@ -39,7 +39,7 @@ namespace STAN.Client
             NatsConn = opts.NatsConn;
             ConnectTimeout = opts.ConnectTimeout;
             CloseTimeout = opts.CloseTimeout;
-            PubAckWait = opts.PubAckWait;
+            PubAckTimeout = opts.PubAckTimeout;
             DiscoverPrefix = opts.DiscoverPrefix;
             MaxPubAcksInFlight = opts.MaxPubAcksInFlight;
             PingInterval = opts.PingInterval;
@@ -107,21 +107,21 @@ namespace STAN.Client
         }
 
         /// <summary>
-        /// PubAckWait is an option to set the timeout (in milliseconds) for waiting for an ACK
+        /// PubAckTimeout is an option to set the timeout (in milliseconds) for waiting for an ACK
         /// for a published message. The value must be greater than zero.
         /// </summary>
-        public int PubAckWait
+        public int PubAckTimeout
         {
             get
             {
-                return _ackTimeout;
+                return _pubAckTimeout;
             }
             set
             {
                 if (value <= 0)
                     throw new ArgumentOutOfRangeException(nameof(value), value, "PubAckWait must be greater than zero.");
 
-                _ackTimeout = value;
+                _pubAckTimeout = value;
             }
         }
 
