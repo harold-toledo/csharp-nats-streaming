@@ -23,9 +23,9 @@ namespace STAN.Client.UnitTests
 {
     public class UnitTestBasic
     {
-        static readonly int DEFAULT_WAIT = 10000;
-        static readonly string CLUSTER_ID = "test-cluster";
-        static readonly string CLIENT_ID = "me";
+        const int DEFAULT_WAIT = 10000;
+        const string CLUSTER_ID = "test-cluster";
+        const string CLIENT_ID = "me";
 
         EventHandler<StanMsgHandlerArgs> noopMh = (obj, args) => { /* NOOP */ };
 
@@ -1707,13 +1707,14 @@ namespace STAN.Client.UnitTests
             }
         }
 
-        private void testSubscriberClose(string channel, bool useQG)
+        private void testSubscriberClose(bool useQG)
         {
             using (var sc = DefaultConnection)
             {
+                string channel = useQG ? "durqueuesub" : "dursub";
                 int received = 0;
                 bool error = false;
-                AutoResetEvent ev = new AutoResetEvent(false);
+                var ev = new AutoResetEvent(false);
 
                 // Send 1 message.
                 sc.Publish(channel, System.Text.Encoding.UTF8.GetBytes("msg"));
@@ -1727,15 +1728,12 @@ namespace STAN.Client.UnitTests
                     ev.Set();
                 };
 
-                StanSubscriptionOptions so = StanSubscriptionOptions.GetDefaultOptions();
+                var so = StanSubscriptionOptions.GetDefaultOptions();
                 so.DeliverAllAvailable();
                 so.DurableName = "dur";
+                so.LeaveOpen = true;
 
-                IStanSubscription sub;
-                if (useQG)
-                    sub = sc.Subscribe(channel, "group", so, eh);
-                else
-                    sub = sc.Subscribe(channel, so, eh);
+                var sub = useQG ? sc.Subscribe(channel, "group", so, eh) : sc.Subscribe(channel, so, eh);
 
                 // wait for the first message
                 Assert.True(ev.WaitOne(DEFAULT_WAIT));
@@ -1761,13 +1759,11 @@ namespace STAN.Client.UnitTests
 
                 // restart the durable
                 ev.Reset();
-                if (useQG)
-                    sub = sc.Subscribe(channel, "group", so, eh);
-                else
-                    sub = sc.Subscribe(channel, so, eh);
+
+                sub = useQG ? sc.Subscribe(channel, "group", so, eh) : sc.Subscribe(channel, so, eh);
 
                 // wait for the second message
-                Assert.True(ev.WaitOne(10000));
+                Assert.True(ev.WaitOne(DEFAULT_WAIT));
                 Assert.False(error, "invalid message seq received.");
 
                 sub.Unsubscribe();
@@ -1803,8 +1799,8 @@ namespace STAN.Client.UnitTests
                     }
                 }
 
-                testSubscriberClose("dursub", false);
-                testSubscriberClose("durqueuesub", true);
+                testSubscriberClose(false);
+                testSubscriberClose(true);
             }
         }
 
