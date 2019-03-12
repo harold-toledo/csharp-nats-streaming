@@ -1739,7 +1739,11 @@ namespace STAN.Client.UnitTests
                 Assert.True(ev.WaitOne(DEFAULT_WAIT));
                 Assert.False(error, "invalid message seq received.");
 
-                // Wait a bit to reduce risk of server processing unsubscribe before ACK
+                // Wait a bit to reduce risk of server processing unsubscribe before ACK.
+                // If for some reason the server doesn't have time to process the ACK
+                // before closing the subscription, the test will fail because the 
+                // next time the subscription is created, the first message will be redelivered
+                // and the check in the subscription handler will fail.
                 Thread.Sleep(500);
 
                 try
