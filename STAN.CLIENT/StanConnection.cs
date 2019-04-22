@@ -286,7 +286,6 @@ namespace STAN.Client
                         string err = pingResp.Error?.Trim() ?? string.Empty;
                         if (err.Length > 0)
                         {
-                            Dispose();
                             PingsFailure(err);
                         }
                     }
@@ -330,7 +329,6 @@ namespace STAN.Client
                     _token.ThrowIfCancellationRequested();
 
                     // If we are here, a connection failure has occurred.
-                    Dispose();
                     PingsFailure(err);
 
                 }, _token);
@@ -346,6 +344,8 @@ namespace STAN.Client
             // Making sure that if a connection lost handler was specified, it will be called only once.
             if (Interlocked.CompareExchange(ref _pingsFailureNotified, 1, 0) == 0)
             {
+                Dispose();
+
                 try
                 {
                     Options.ConnectionLostHandler?.Invoke(details);
